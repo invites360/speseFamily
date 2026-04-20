@@ -1,7 +1,7 @@
 {
   "name": "Spese Family",
   "short_name": "Spese",
-  "start_url": "/speseFamily/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",

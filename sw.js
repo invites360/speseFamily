@@ -1,8 +1,9 @@
 const CACHE_NAME = "spese-family-v1";
 
 const urlsToCache = [
-  "/speseFamily/",
-  "/speseFamily/index.html"
+  "./",
+  "./index.html",
+  "./manifest.json"
 ];
 
 self.addEventListener("install", event => {
