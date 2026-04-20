@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #020617);
+      color: white;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      padding: 30px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      padding: 25px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    h1, h2 {
+      margin-bottom: 15px;
+    }
+
+    canvas {
+      max-height: 400px;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    select, input, textarea {
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #1e293b;
+      color: white;
+    }
+
+    button {
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #22c55e, #16a34a);
+      color: black;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .summary {
+      margin-top: 20px;
+    }
+
+    .summary div {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+    }
+
+    .red { color: #ef4444; }
+    .green { color: #22c55e; }
+
+    .period {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    @media (max-width: 800px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+  <div class="grid">
+
+    <!-- DASHBOARD -->
+    <div class="card">
+      <h1>Dashboard Entrate & Spese</h1>
+
+      <div class="period">
+        <select id="month"></select>
+        <select id="year"></select>
+      </div>
+
+      <canvas id="chart"></canvas>
+    </div>
+
+    <!-- FORM -->
+    <div class="card">
+      <h2>Aggiungi Spesa</h2>
+
+      <form id="expenseForm">
+
+        <select id="reporter">
+          <option value="Claudia">Claudia</option>
+          <option value="Peppe">Peppe</option>
+        </select>
+
+        <select id="category">
+          <option value="SPESE FISSE">SPESE FISSE</option>
+          <option value="CIBO">CIBO</option>
+          <option value="VARIE CASA">VARIE CASA</option>
+          <option value="AUTO">AUTO</option>
+          <option value="SFIZI">SFIZI</option>
+        </select>
+
+        <input type="number" id="amount" placeholder="Importo" required />
+
+        <textarea id="description" placeholder="Descrizione"></textarea>
+
+        <button type="submit">Aggiungi</button>
+      </form>
+
+      <div class="summary">
+        <div><span>Entrate</span><span id="income">3000€</span></div>
+        <div class="red"><span>Spese</span><span id="spent">0€</span></div>
+        <div class="green"><span>Rimanenza</span><span id="remaining">3000€</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://pypeboroffarllxbsgpl.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5cGVib3JvZmZhcmxseGJzZ3BsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyOTEzMDcsImV4cCI6MjA4NTg2NzMwN30.zI99QWIHwERLHx3sF1X7gRhB8RJ_1kr8QzzHyi8uLHQ';
+
+  const clientSupabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const TOTAL = 3500;
+
+  const monthNames = [
+    'Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+    'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'
+  ];
+
+  const monthSelect = document.getElementById('month');
+  const yearSelect = document.getElementById('year');
+
+  const now = new Date();
+
+  // mesi
+  monthNames.forEach((m, i) => {
+    const opt = document.createElement('option');
+    opt.value = i + 1;
+    opt.textContent = m;
+    if (i + 1 === now.getMonth() + 1) opt.selected = true;
+    monthSelect.appendChild(opt);
+  });
+
+  // anni
+  for (let y = now.getFullYear() - 5; y <= now.getFullYear() + 2; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === now.getFullYear()) opt.selected = true;
+    yearSelect.appendChild(opt);
+  }
+
+  // chart
+  const ctx = document.getElementById('chart');
+
+  const chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Spese', 'Rimanenza'],
+      datasets: [{
+        data: [0, TOTAL],
+        backgroundColor: ['#ef4444', '#22c55e']
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+
+  async function loadExpenses() {
+    const mese = parseInt(monthSelect.value);
+    const anno = parseInt(yearSelect.value);
+
+    const { data, error } = await clientSupabase
+      .from('SPESA')
+      .select('IM_SPESA')
+      .eq('MESE', mese)
+      .eq('ANNO', anno);
+
+    if (error) {
+      console.error(error);
+      return 0;
+    }
+
+    return data.reduce((sum, r) => sum + Number(r.IM_SPESA || 0), 0);
+  }
+
+  async function updateUI() {
+    const expenses = await loadExpenses();
+    const remaining = TOTAL - expenses;
+
+    chart.data.datasets[0].data = [expenses, remaining];
+    chart.update();
+
+    document.getElementById('spent').innerText = expenses.toFixed(2) + '€';
+    document.getElementById('remaining').innerText = remaining.toFixed(2) + '€';
+  }
+
+  document.getElementById('expenseForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const amount = parseFloat(document.getElementById('amount').value);
+    const description = document.getElementById('description').value;
+    const category = document.getElementById('category').value;
+    const reporter = document.getElementById('reporter').value;
+
+    if (!amount || amount <= 0) return;
+
+    const mese = parseInt(monthSelect.value);
+    const anno = parseInt(yearSelect.value);
+
+    const { error } = await clientSupabase.from('SPESA').insert([
+      {
+        IM_SPESA: amount,
+        DS_SPESA: description,
+        MESE: mese,
+        ANNO: anno,
+        CATEGORIA: category,
+        SEGNALANTE: reporter
+      }
+    ]);
+
+    if (error) {
+      console.error(error);
+      alert('Errore inserimento');
+      return;
+    }
+
+    this.reset();
+    await updateUI();
+  });
+
+  monthSelect.addEventListener('change', updateUI);
+  yearSelect.addEventListener('change', updateUI);
+
+  updateUI();
+</script>
+
+</body>
+</html>
