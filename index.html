@@ -7,9 +7,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0f172a">
   <link rel="apple-touch-icon" href="icon-192.png">
+
   <style>
     body {
       margin: 0;
@@ -89,6 +91,18 @@
       margin-bottom: 15px;
     }
 
+    /* MOVIMENTI */
+    .movement {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .movement small {
+      opacity: 0.7;
+    }
+
     @media (max-width: 800px) {
       .grid {
         grid-template-columns: 1fr;
@@ -100,6 +114,7 @@
 <body>
 
 <div class="container">
+
   <div class="grid">
 
     <!-- DASHBOARD -->
@@ -134,7 +149,6 @@
         </select>
 
         <input type="number" id="amount" placeholder="Importo" required />
-
         <textarea id="description" placeholder="Descrizione"></textarea>
 
         <button type="submit">Aggiungi</button>
@@ -148,6 +162,13 @@
     </div>
 
   </div>
+
+  <!-- MOVIMENTI -->
+  <div class="card" style="margin-top: 20px;">
+    <h2>Movimenti del mese</h2>
+    <div id="movimentiList"></div>
+  </div>
+
 </div>
 
 <script>
@@ -168,7 +189,6 @@
 
   const now = new Date();
 
-  // mesi
   monthNames.forEach((m, i) => {
     const opt = document.createElement('option');
     opt.value = i + 1;
@@ -177,7 +197,6 @@
     monthSelect.appendChild(opt);
   });
 
-  // anni
   for (let y = now.getFullYear() - 5; y <= now.getFullYear() + 2; y++) {
     const opt = document.createElement('option');
     opt.value = y;
@@ -186,10 +205,7 @@
     yearSelect.appendChild(opt);
   }
 
-  // chart
-  const ctx = document.getElementById('chart');
-
-  const chart = new Chart(ctx, {
+  const chart = new Chart(document.getElementById('chart'), {
     type: 'doughnut',
     data: {
       labels: ['Spese', 'Rimanenza'],
@@ -199,9 +215,7 @@
       }]
     },
     options: {
-      plugins: {
-        legend: { display: false }
-      }
+      plugins: { legend: { display: false } }
     }
   });
 
@@ -215,12 +229,46 @@
       .eq('MESE', mese)
       .eq('ANNO', anno);
 
-    if (error) {
-      console.error(error);
-      return 0;
+    if (error) return 0;
+
+    return data.reduce((s, r) => s + Number(r.IM_SPESA || 0), 0);
+  }
+
+  async function loadMovements() {
+    const mese = parseInt(monthSelect.value);
+    const anno = parseInt(yearSelect.value);
+
+    const { data, error } = await clientSupabase
+      .from('SPESA')
+      .select('IM_SPESA, DS_SPESA, CATEGORIA, SEGNALANTE')
+      .eq('MESE', mese)
+      .eq('ANNO', anno)
+      .order('id', { ascending: false });
+
+    if (error) return;
+
+    const container = document.getElementById('movimentiList');
+    container.innerHTML = '';
+
+    if (!data.length) {
+      container.innerHTML = '<p>Nessun movimento</p>';
+      return;
     }
 
-    return data.reduce((sum, r) => sum + Number(r.IM_SPESA || 0), 0);
+    data.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'movement';
+
+      div.innerHTML = `
+        <div>
+          <strong>${r.CATEGORIA}</strong><br>
+          <small>${r.DS_SPESA || ''} - ${r.SEGNALANTE}</small>
+        </div>
+        <div><strong>${Number(r.IM_SPESA).toFixed(2)}€</strong></div>
+      `;
+
+      container.appendChild(div);
+    });
   }
 
   async function updateUI() {
@@ -232,9 +280,11 @@
 
     document.getElementById('spent').innerText = expenses.toFixed(2) + '€';
     document.getElementById('remaining').innerText = remaining.toFixed(2) + '€';
+
+    await loadMovements();
   }
 
-  document.getElementById('expenseForm').addEventListener('submit', async function (e) {
+  document.getElementById('expenseForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const amount = parseFloat(document.getElementById('amount').value);
@@ -247,42 +297,35 @@
     const mese = parseInt(monthSelect.value);
     const anno = parseInt(yearSelect.value);
 
-    const { error } = await clientSupabase.from('SPESA').insert([
-      {
-        IM_SPESA: amount,
-        DS_SPESA: description,
-        MESE: mese,
-        ANNO: anno,
-        CATEGORIA: category,
-        SEGNALANTE: reporter
-      }
-    ]);
+    const { error } = await clientSupabase.from('SPESA').insert([{
+      IM_SPESA: amount,
+      DS_SPESA: description,
+      MESE: mese,
+      ANNO: anno,
+      CATEGORIA: category,
+      SEGNALANTE: reporter
+    }]);
 
     if (error) {
-      console.error(error);
       alert('Errore inserimento');
       return;
     }
 
-    this.reset();
-    await updateUI();
+    e.target.reset();
+    updateUI();
   });
 
   monthSelect.addEventListener('change', updateUI);
   yearSelect.addEventListener('change', updateUI);
 
   updateUI();
-  
-// ✅ FIX SERVICE WORKER (NUOVO CORRETTO)
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('./sw.js', {
-          scope: './'
-        });
-        console.log('SW OK:', reg.scope);
+        await navigator.serviceWorker.register('./sw.js', { scope: './' });
       } catch (err) {
-        console.error('SW ERROR:', err);
+        console.error(err);
       }
     });
   }
