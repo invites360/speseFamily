@@ -91,7 +91,6 @@
       margin-bottom: 15px;
     }
 
-    /* MOVIMENTI */
     .movement {
       display: flex;
       justify-content: space-between;
@@ -117,7 +116,6 @@
 
   <div class="grid">
 
-    <!-- DASHBOARD -->
     <div class="card">
       <h1>Dashboard Entrate & Spese</h1>
 
@@ -129,12 +127,10 @@
       <canvas id="chart"></canvas>
     </div>
 
-    <!-- FORM -->
     <div class="card">
       <h2>Aggiungi Spesa</h2>
 
       <form id="expenseForm">
-
         <select id="reporter">
           <option value="Claudia">Claudia</option>
           <option value="Peppe">Peppe</option>
@@ -163,7 +159,6 @@
 
   </div>
 
-  <!-- MOVIMENTI -->
   <div class="card" style="margin-top: 20px;">
     <h2>Movimenti del mese</h2>
     <div id="movimentiList"></div>
@@ -174,6 +169,7 @@
 <script>
   const SUPABASE_URL = 'https://pypeboroffarllxbsgpl.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5cGVib3JvZmZhcmxseGJzZ3BsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyOTEzMDcsImV4cCI6MjA4NTg2NzMwN30.zI99QWIHwERLHx3sF1X7gRhB8RJ_1kr8QzzHyi8uLHQ';
+
 
   const clientSupabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -223,13 +219,11 @@
     const mese = parseInt(monthSelect.value);
     const anno = parseInt(yearSelect.value);
 
-    const { data, error } = await clientSupabase
+    const { data } = await clientSupabase
       .from('SPESA')
       .select('IM_SPESA')
       .eq('MESE', mese)
       .eq('ANNO', anno);
-
-    if (error) return 0;
 
     return data.reduce((s, r) => s + Number(r.IM_SPESA || 0), 0);
   }
@@ -238,14 +232,12 @@
     const mese = parseInt(monthSelect.value);
     const anno = parseInt(yearSelect.value);
 
-    const { data, error } = await clientSupabase
+    const { data } = await clientSupabase
       .from('SPESA')
-      .select('IM_SPESA, DS_SPESA, CATEGORIA, SEGNALANTE')
+      .select('IM_SPESA, DS_SPESA, CATEGORIA, SEGNALANTE, DT_SEGNALAZIONE_SPESA')
       .eq('MESE', mese)
       .eq('ANNO', anno)
-      .order('id', { ascending: false });
-
-    if (error) return;
+      .order('DT_SEGNALAZIONE_SPESA', { ascending: false });
 
     const container = document.getElementById('movimentiList');
     container.innerHTML = '';
@@ -256,13 +248,23 @@
     }
 
     data.forEach(r => {
+      const dataOra = r.DT_SEGNALAZIONE_SPESA
+        ? new Date(r.DT_SEGNALAZIONE_SPESA).toLocaleString('it-IT', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : '';
+
       const div = document.createElement('div');
       div.className = 'movement';
 
       div.innerHTML = `
         <div>
           <strong>${r.CATEGORIA}</strong><br>
-          <small>${r.DS_SPESA || ''} - ${r.SEGNALANTE}</small>
+          <small>${r.DS_SPESA || ''} - ${r.SEGNALANTE}</small><br>
+          <small>${dataOra}</small>
         </div>
         <div><strong>${Number(r.IM_SPESA).toFixed(2)}€</strong></div>
       `;
@@ -297,7 +299,7 @@
     const mese = parseInt(monthSelect.value);
     const anno = parseInt(yearSelect.value);
 
-    const { error } = await clientSupabase.from('SPESA').insert([{
+    await clientSupabase.from('SPESA').insert([{
       IM_SPESA: amount,
       DS_SPESA: description,
       MESE: mese,
@@ -305,11 +307,6 @@
       CATEGORIA: category,
       SEGNALANTE: reporter
     }]);
-
-    if (error) {
-      alert('Errore inserimento');
-      return;
-    }
 
     e.target.reset();
     updateUI();
@@ -319,16 +316,6 @@
   yearSelect.addEventListener('change', updateUI);
 
   updateUI();
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-      try {
-        await navigator.serviceWorker.register('./sw.js', { scope: './' });
-      } catch (err) {
-        console.error(err);
-      }
-    });
-  }
 </script>
 
 </body>
